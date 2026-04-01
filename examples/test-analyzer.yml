@@ -1,0 +1,44 @@
+# FailChain example configuration for a Playwright + TypeScript project
+# Copy this to your project root as `test-analyzer.yml` and adjust paths.
+#
+# Run:  failchain analyze
+#       failchain analyze --verbose
+#       failchain analyze --output my-report.md
+
+# Parser: auto | junit-xml | playwright-json
+parser: auto
+report_path: ./playwright-report/results.xml
+
+# Test framework settings
+framework:
+  name: playwright
+  test_dir: ./tests
+  runner_command: "npx playwright test"
+  screenshot_dir: ./playwright-report/screenshots
+
+# Directories to search for application source code
+# Used by the search_source_code agent tool
+source_dirs:
+  - ./src
+  - ./backend/src
+
+# Related file resolution — how to find page objects, fixtures, etc.
+related_files:
+  strategy: playwright-pom   # playwright-pom | cypress-commands | pytest-fixtures | none
+  page_objects_dir: ./tests/pages
+
+# LLM configuration
+# Set OPENAI_API_KEY (or ANTHROPIC_API_KEY) in your environment
+llm:
+  agent_model: openai:gpt-4o-mini   # cost-effective for batch analysis
+  vision_model: gpt-4o              # vision-capable model for screenshots
+  max_prompt_tokens: 90000
+  max_retries: 3
+
+# Analysis behaviour
+analysis:
+  max_failures: null      # null = analyze all; set to 20 to limit scope
+  max_screenshots: 5      # max screenshots to analyze per failure group
+  skip_reruns: false      # true = agent won't call rerun_test
+  skip_screenshots: false # true = skip all vision analysis (faster, cheaper)
+  collapse_threshold: 5   # collapse files with >= 5 distinct error groups

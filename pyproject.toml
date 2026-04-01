@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "failchain"
+version = "0.1.0"
+description = "AI-powered test failure root-cause analysis for any testing framework"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["testing", "ai", "llm", "playwright", "pytest", "ci", "debugging"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "langchain>=1.0",
+    "langchain-openai>=0.3",
+    "langchain-community>=0.3",
+    "langchain-core>=0.3",
+    "openai>=1.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["langchain-anthropic>=0.2"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+failchain = "failchain.cli:main"
+
+[project.entry-points."failchain.parsers"]
+"junit-xml" = "failchain.parsers.junit_xml:JUnitXMLParser"
+"playwright-json" = "failchain.parsers.playwright_json:PlaywrightJSONParser"
+
+[project.entry-points."failchain.screenshot_strategies"]
+"playwright" = "failchain.screenshots.playwright:PlaywrightScreenshotDiscovery"
+"cypress" = "failchain.screenshots.cypress:CypressScreenshotDiscovery"
+
+[project.entry-points."failchain.related_file_strategies"]
+"playwright-pom" = "failchain.related_files.playwright_pom:PlaywrightPOMResolver"
+"cypress-commands" = "failchain.related_files.cypress_commands:CypressCommandsResolver"
+"pytest-fixtures" = "failchain.related_files.pytest_fixtures:PytestFixturesResolver"
+
+[tool.hatch.build.targets.wheel]
+packages = ["failchain"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::pytest.PytestCollectionWarning"]
