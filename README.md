@@ -2,9 +2,6 @@
 
 **AI-powered test failure root-cause analysis for any testing framework.**
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen)
 
 ---
 
