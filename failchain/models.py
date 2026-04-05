@@ -46,6 +46,8 @@ class FailureGroup:
     screenshot_analyses: list[str] = field(default_factory=list)
     # Whether multiple distinct error groups were collapsed into this one
     is_collapsed: bool = False
+    # Deterministic pre-analysis hints injected into the LLM prompt
+    static_hints: list[str] = field(default_factory=list)
 
     @property
     def representative(self) -> TestResult:

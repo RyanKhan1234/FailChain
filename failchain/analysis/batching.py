@@ -36,6 +36,8 @@ def group_to_prompt_text(group: FailureGroup) -> str:
         lines.append(f"**Full error:**\n```\n{full_error}\n```")
     if group.is_collapsed:
         lines.append(f"*Note: {len(group.failures)} failures collapsed from this file.*")
+    for hint in group.static_hints:
+        lines.append(f"**Pre-analysis finding:** {hint}")
     for analysis in group.screenshot_analyses:
         lines.append(f"**Screenshot analysis:** {analysis}")
     return "\n".join(lines)

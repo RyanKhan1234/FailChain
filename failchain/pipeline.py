@@ -15,6 +15,7 @@ from failchain.analysis.agent import analyze_batch, build_agent
 from failchain.analysis.batching import pack_into_batches
 from failchain.analysis.grouping import group_failures
 from failchain.analysis.screenshot_analysis import analyze_screenshots
+from failchain.analysis.static_hints import compute_static_hints
 from failchain.config import FailChainConfig
 from failchain.models import AnalysisReport, AnalysisResult, FailureGroup
 from failchain.parsers.registry import ParserRegistry
@@ -91,6 +92,9 @@ def run_pipeline(
         collapse_threshold=config.analysis.collapse_threshold,
     )
     _log(verbose, f"  {len(failures)} failures -> {len(groups)} group(s)")
+
+    for group in groups:
+        group.static_hints = compute_static_hints(group, config.source_dirs)
 
     # ------------------------------------------------------------------
     # Phase 4: Vision analysis of screenshots per group
