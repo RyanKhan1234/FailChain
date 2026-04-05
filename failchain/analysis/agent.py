@@ -149,14 +149,20 @@ def build_agent(
     config: FailChainConfig,
     tools: list[BaseTool],
 ) -> object:
-    """Build a LangChain 1.x agent graph configured for failure analysis."""
-    from langchain.agents import create_agent
+    """Build a LangGraph react agent configured for failure analysis.
 
-    return create_agent(
-        model=config.llm.agent_model,
-        tools=tools,
-        system_prompt=_SYSTEM_PROMPT,
+    Uses temperature=0 for deterministic categorization.
+    """
+    from langchain_openai import ChatOpenAI
+    from langgraph.prebuilt import create_react_agent
+
+    _, model_name = (
+        config.llm.agent_model.split(":", 1)
+        if ":" in config.llm.agent_model
+        else ("openai", config.llm.agent_model)
     )
+    llm = ChatOpenAI(model=model_name, temperature=0)
+    return create_react_agent(llm, tools, prompt=_SYSTEM_PROMPT)
 
 
 def analyze_batch(
