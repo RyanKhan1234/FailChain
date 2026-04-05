@@ -28,6 +28,12 @@ def group_to_prompt_text(group: FailureGroup) -> str:
         f"**File:** `{group.spec_file}`",
         f"**Error signature:** {group.error_signature}",
     ]
+    # Include full error detail so the agent sees exact selectors, locator
+    # strings, and line numbers without needing to call tools first.
+    rep = group.representative
+    if rep.error and rep.error != group.error_signature:
+        full_error = rep.error[:1500].strip()
+        lines.append(f"**Full error:**\n```\n{full_error}\n```")
     if group.is_collapsed:
         lines.append(f"*Note: {len(group.failures)} failures collapsed from this file.*")
     for analysis in group.screenshot_analyses:

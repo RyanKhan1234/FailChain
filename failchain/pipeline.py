@@ -91,7 +91,7 @@ def run_pipeline(
         failures,
         collapse_threshold=config.analysis.collapse_threshold,
     )
-    _log(verbose, f"  {len(failures)} failures → {len(groups)} group(s)")
+    _log(verbose, f"  {len(failures)} failures -> {len(groups)} group(s)")
 
     # ------------------------------------------------------------------
     # Phase 4: Vision analysis of screenshots per group
@@ -108,7 +108,7 @@ def run_pipeline(
         groups,
         max_tokens=config.llm.max_prompt_tokens,
     )
-    _log(verbose, f"  {len(groups)} groups → {len(batches)} batch(es)")
+    _log(verbose, f"  {len(groups)} groups -> {len(batches)} batch(es)")
 
     # ------------------------------------------------------------------
     # Phase 6: Build agent + tools
@@ -125,7 +125,7 @@ def run_pipeline(
         ),
         *ToolRegistry.get_extra_tools(),
     ]
-    agent_executor = build_agent(config, tools)
+    agent = build_agent(config, tools)
 
     # ------------------------------------------------------------------
     # Phase 7: Agent analysis (per batch)
@@ -136,17 +136,37 @@ def run_pipeline(
     for batch_num, batch in enumerate(batches, 1):
         _log(verbose, f"  Batch {batch_num}/{len(batches)}: {len(batch)} group(s)")
 
+        # List the failures in this batch so you can follow the agent's work
+        if verbose:
+            for i, group in enumerate(batch, 1):
+                console.print(f"    [dim]{i}.[/dim] {group.representative.title}")
+            console.print()
+
         def _on_retry(attempt: int, exc: Exception) -> None:
             console.print(
                 f"  [yellow]Rate limit hit (attempt {attempt}). Retrying...[/yellow]"
             )
 
+        def _on_tool_call(tool_name: str, args: dict) -> None:
+            if not verbose:
+                return
+            if tool_name == "read_test_source":
+                console.print(f"    [dim]read  [/dim] [cyan]{args.get('path', '')}[/cyan]")
+            elif tool_name == "search_source_code":
+                pattern = args.get("pattern", "")
+                directory = args.get("directory", "")
+                loc = f"  [dim]in {directory}[/dim]" if directory else ""
+                console.print(f"    [dim]search[/dim] [yellow]{pattern!r}[/yellow]{loc}")
+            elif tool_name == "rerun_test":
+                console.print(f"    [dim]rerun [/dim] [magenta]{args.get('path', '')}[/magenta]")
+
         results = analyze_batch(
-            agent_executor=agent_executor,
+            agent=agent,
             batch=batch,
             batch_index=batch_num - 1,
             max_retries=config.llm.max_retries,
             on_retry=_on_retry,
+            on_tool_call=_on_tool_call,
         )
         all_batch_results.append(results)
 
@@ -187,6 +207,8 @@ def _run_screenshot_analysis(
 
     for group in groups_with_screenshots:
         screenshots = group.representative.screenshots[: config.analysis.max_screenshots]
+        if verbose:
+            console.print(f"  [dim]analyzing[/dim] [bold]{group.representative.title}[/bold]")
         try:
             analyses = analyze_screenshots(
                 screenshots=screenshots,
@@ -195,6 +217,7 @@ def _run_screenshot_analysis(
                 vision_model=config.llm.vision_model,
                 max_screenshots=config.analysis.max_screenshots,
                 max_retries=config.llm.max_retries,
+                on_progress=lambda p: _log(verbose, f"    [dim]screenshot[/dim] [cyan]{p}[/cyan]"),
             )
             group.screenshot_analyses = analyses
         except Exception as exc:

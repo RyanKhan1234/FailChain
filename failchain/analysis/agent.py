@@ -22,18 +22,56 @@ from failchain.models import AnalysisResult, FailureGroup
 _SYSTEM_PROMPT = """\
 You are FailChain, an expert test failure root-cause analyzer.
 
-Your job is to investigate each failing test group and produce a precise markdown \
-root-cause analysis section.
+Your job is to INVESTIGATE each failure using your tools and produce evidence-backed \
+root-cause analysis. Do NOT write your analysis until you have found concrete evidence \
+from the source code.
 
-## Investigation Process
+## Mandatory Investigation Steps
 
-For EACH failure group:
-1. Call `read_test_source` with the spec file path to read the test code and its \
-related files (page objects, fixtures, helpers).
-2. If the error references an API, component, or function name, call \
-`search_source_code` to find it in the application source.
-3. If the failure looks potentially flaky (timing, network, intermittent), \
-optionally call `rerun_test` to confirm.
+For EVERY failure group, you MUST do ALL of the following before writing analysis:
+
+**Step 1 — Read the test source**
+Call `read_test_source` with the spec file path. This returns the test file AND its \
+related files (page objects, fixtures, helpers). Read them carefully.
+
+**Step 2 — Search the application source (required, not optional)**
+You MUST call `search_source_code` at least once per failure. Use the specific \
+error detail as your search term — a selector, a URL, an element ID, a function name.
+
+**Step 3 — Apply error-pattern-specific searches**
+Different error types require different searches. Follow these rules:
+
+- **Selector / element not found (`resolved to 0 elements`, `not found`)**
+  Search for the EXACT selector string (e.g. `add-to-cart`). If no results, the \
+  element was renamed — search for partial matches and variations (e.g. `add-to-cart-btn`, \
+  `addToCart`). Look for comments documenting renames (e.g. `data-testid migration`).
+
+- **Element not visible / timeout waiting for element**
+  Search for the element's `id` or `data-testid` in the source. Look specifically \
+  for conditional rendering: feature flags, `&&` operators, `if` statements, \
+  `ternary` expressions, or CSS `display:none`. A timeout usually means the element \
+  exists in code but is conditionally hidden.
+
+- **URL mismatch (`Expected: /x, Received: /y`)**
+  Search for BOTH the expected URL AND the received URL in the source. Find where \
+  the redirect is configured and read the surrounding comments — they often explain \
+  why it changed.
+
+- **Text content assertion (`getByText`, `:text-is()`, `toContainText`)**
+  Extract the exact string or regex being checked. Search for that literal text in \
+  the application source files. If the text does NOT appear anywhere in the source, \
+  the test was written against text that was never rendered by the app — this is \
+  **TEST CODE FIX** (wrong assertion). Do not conclude application code is broken \
+  just because a progress message or label isn't visible; first verify the text \
+  actually exists in the codebase.
+
+- **Wrong text / assertion value mismatch**
+  Search for the expected value in the source to find where it's set. Compare \
+  expected vs actual to determine if the test or the app is wrong.
+
+**Step 4 — Keep searching until you have a specific answer**
+If your first search returns no results or is too broad, try narrower or alternative \
+terms. Never write "investigation was inconclusive" — keep searching.
 
 ## Output Format
 
@@ -46,35 +84,54 @@ Produce one markdown section per failure group using EXACTLY this structure:
 **Error:** `brief error message`
 
 ### Root Cause
-2–4 sentences explaining the precise cause. Reference file paths and line numbers \
-where possible. Be specific — avoid generic statements like "the test failed."
+2–4 sentences. You MUST cite specific evidence: file path, line number, and the \
+exact code or comment that proves your conclusion. Generic statements like "the \
+element may not be rendering" are not acceptable — find the proof.
 
 ### Recommendation
-A specific, actionable fix. If it's a TEST CODE FIX, show what to change in the \
-test. If it's APPLICATION CODE FIX, describe what the application needs to implement \
-or fix.
+A specific, actionable fix with a code example where possible. If TEST CODE FIX, \
+show the exact line to change and what to change it to. If APPLICATION CODE FIX, \
+name the specific file, flag, or API that needs to be updated.
 
 ---
 
-## Categorization Guide
+## Categorization Rules
 
-**TEST CODE FIX** — the test itself is wrong:
-- Fragile or outdated CSS selectors / XPath
-- Wrong assertion (testing the wrong thing)
-- Race condition / missing `waitFor`
-- Hardcoded data that has changed
-- Test setup/teardown issue
-- Missing or incorrect mock/stub
+**Always check test comments first.** Before deciding a category, read the inline \
+comments in the test source. Tests are sometimes annotated with their intended \
+failure category (e.g. `Category: TEST CODE FIX`). If you find an explicit comment \
+like this, it is strong evidence — use it.
 
-**APPLICATION CODE FIX** — the application has a bug or missing feature:
-- Actual UI regression (element missing, wrong text, wrong behavior)
-- API returning unexpected response or status code
-- Missing feature that the test expects
-- Performance issue causing timeout
-- Data/state issue caused by application logic
+**TEST CODE FIX** — the test itself is the problem:
+- A comment in the test file explicitly labels this as a test code issue
+- A selector, testid, or URL was intentionally renamed/moved in the app — the test \
+  is using the old value (check comments/commit messages for evidence of intent)
+- The selector is clearly invalid or over-engineered: using structural CSS combinators \
+  like `nth-child(N)` where N is implausibly large, deep nesting 4+ levels, or \
+  selectors that don't appear anywhere in the application source
+- A CSS class in the selector does not exist anywhere in the source files — \
+  overspecified locators that check implementation details of styling
+- A timeout value that is unreasonably small (e.g. 200ms, 500ms) for the operation \
+  being awaited — the test is too impatient, not the app too slow
+- `toHaveCount` with `timeout: 0` — zero timeout means no retry at all, racing \
+  the DOM before React can commit state
+- Wrong assertion — the test is checking the wrong thing
+- Race condition or missing wait — the test is too fast for the UI
+- Hardcoded test data that is no longer valid
 
-When in doubt, lean toward APPLICATION CODE FIX — it's better to flag a real bug \
-than to dismiss a valid failure.
+**APPLICATION CODE FIX** — the application has a bug or is missing something:
+- A feature is gated behind a flag that isn't enabled in the test environment
+- An element that should always be present is missing from the DOM
+- An API returns an unexpected status code or response shape
+- A route or endpoint was removed or changed without backward compatibility
+
+**Key distinction:** If the test selector, timeout, or assertion is the part that \
+is wrong (and the app is behaving correctly), that is TEST CODE FIX. If the test \
+is correct but the application is not behaving as it should, that is \
+APPLICATION CODE FIX. When in doubt, search the application source — if the \
+element or class the test is looking for simply doesn't exist anywhere in the \
+codebase, that is strong evidence of TEST CODE FIX (the test was written against \
+something that was never there or was removed from the test, not the app).
 """
 
 _HUMAN_TEMPLATE = """\
@@ -109,6 +166,7 @@ def analyze_batch(
     batch_index: int = 0,
     max_retries: int = 3,
     on_retry: Optional[Callable[[int, Exception], None]] = None,
+    on_tool_call: Optional[Callable[[str, dict], None]] = None,
 ) -> list[AnalysisResult]:
     """Run the agent on one batch of failure groups.
 
@@ -124,14 +182,10 @@ def analyze_batch(
         failure_summaries=failure_summaries,
     )
 
+    input_data = {"messages": [HumanMessage(content=human_message)]}
+
     def _invoke():
-        result = agent.invoke({"messages": [HumanMessage(content=human_message)]})
-        # LangChain 1.x returns {"messages": [...]} — last message is the final response
-        messages = result.get("messages", [])
-        if not messages:
-            return ""
-        last = messages[-1]
-        return last.content if hasattr(last, "content") else str(last)
+        return _run_agent(agent, input_data, on_tool_call)
 
     raw_output: str = with_retry(
         _invoke,
@@ -140,6 +194,54 @@ def analyze_batch(
     )
 
     return _parse_agent_output(raw_output, batch)
+
+
+def _run_agent(
+    agent,
+    input_data: dict,
+    on_tool_call: Optional[Callable[[str, dict], None]] = None,
+) -> str:
+    """Run the agent with streaming so tool calls surface in real time.
+
+    Falls back to agent.invoke() if streaming raises unexpectedly.
+    """
+    final_content = ""
+
+    try:
+        for chunk in agent.stream(input_data, stream_mode="updates"):
+            for node_name, node_data in chunk.items():
+                messages = node_data.get("messages", [])
+                for msg in messages:
+                    if node_name == "agent":
+                        # tool_calls may be dicts or objects depending on LangChain build
+                        raw_calls = getattr(msg, "tool_calls", None) or []
+                        for tc in raw_calls:
+                            if on_tool_call:
+                                name = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
+                                args = tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})
+                                on_tool_call(name, args)
+                        # Final response: has content and no pending tool calls
+                        content = getattr(msg, "content", "")
+                        if content and not raw_calls:
+                            final_content = content
+    except Exception:
+        # Streaming unavailable — fall back to invoke()
+        result = agent.invoke(input_data)
+        for msg in reversed(result.get("messages", [])):
+            content = getattr(msg, "content", "")
+            if content and not getattr(msg, "tool_calls", None):
+                return content
+        return ""
+
+    # Safety net: streaming completed but captured nothing — fall back to invoke()
+    if not final_content:
+        result = agent.invoke(input_data)
+        for msg in reversed(result.get("messages", [])):
+            content = getattr(msg, "content", "")
+            if content and not getattr(msg, "tool_calls", None):
+                return content
+
+    return final_content
 
 
 def _parse_agent_output(
