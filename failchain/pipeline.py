@@ -93,15 +93,15 @@ def run_pipeline(
     _log(verbose, f"  {len(failures)} failures -> {len(groups)} group(s)")
 
     # ------------------------------------------------------------------
-    # Phase 2b: Vision analysis of screenshots per group
+    # Phase 4: Vision analysis of screenshots per group
     # ------------------------------------------------------------------
     if not config.analysis.skip_screenshots:
         groups = _run_screenshot_analysis(groups, config, verbose)
 
     # ------------------------------------------------------------------
-    # Phase 4: Token-aware batching
+    # Phase 5: Token-aware batching
     # ------------------------------------------------------------------
-    _log(verbose, "[bold]Phase 4:[/bold] Packing groups into token-aware batches")
+    _log(verbose, "[bold]Phase 5:[/bold] Packing groups into token-aware batches")
 
     batches = pack_into_batches(
         groups,
@@ -110,9 +110,9 @@ def run_pipeline(
     _log(verbose, f"  {len(groups)} groups -> {len(batches)} batch(es)")
 
     # ------------------------------------------------------------------
-    # Phase 5: Build agent + tools
+    # Phase 6: Build agent + tools
     # ------------------------------------------------------------------
-    _log(verbose, "[bold]Phase 5:[/bold] Building agent and tools")
+    _log(verbose, "[bold]Phase 6:[/bold] Building agent and tools")
 
     related_files_resolver = _build_related_files_resolver(config)
     tools = [
@@ -127,9 +127,9 @@ def run_pipeline(
     agent = build_agent(config, tools)
 
     # ------------------------------------------------------------------
-    # Phase 6: Agent analysis (per batch)
+    # Phase 7: Agent analysis (per batch)
     # ------------------------------------------------------------------
-    _log(verbose, f"[bold]Phase 6:[/bold] Running agent analysis across {len(batches)} batch(es)")
+    _log(verbose, f"[bold]Phase 7:[/bold] Running agent analysis across {len(batches)} batch(es)")
 
     def _on_retry(attempt: int, exc: Exception) -> None:
         console.print(
@@ -170,9 +170,9 @@ def run_pipeline(
         all_batch_results.append(results)
 
     # ------------------------------------------------------------------
-    # Phase 7: Merge + write report
+    # Phase 8: Merge + write report
     # ------------------------------------------------------------------
-    _log(verbose, "[bold]Phase 7:[/bold] Assembling final report")
+    _log(verbose, "[bold]Phase 8:[/bold] Assembling final report")
 
     report = merge_batch_reports(all_batch_results)
     write_report(report, output_path=output_path, source_path=config.report_path)
@@ -202,7 +202,7 @@ def _run_screenshot_analysis(
     if not groups_with_screenshots:
         return groups
 
-    _log(verbose, f"[bold]Phase 2b:[/bold] Vision analysis for {len(groups_with_screenshots)} group(s) with screenshots")
+    _log(verbose, f"[bold]Phase 4:[/bold] Vision analysis for {len(groups_with_screenshots)} group(s) with screenshots")
 
     for group in groups_with_screenshots:
         screenshots = group.representative.screenshots[: config.analysis.max_screenshots]
