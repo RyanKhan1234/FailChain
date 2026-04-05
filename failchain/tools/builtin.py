@@ -47,7 +47,7 @@ def make_read_test_source_tool(
             try:
                 related = related_files_resolver.resolve(test_path)
                 files_to_read.extend(Path(p) for p in related)
-            except Exception as exc:
+            except Exception:
                 pass  # Don't let resolver errors block analysis
 
         sections: list[str] = []

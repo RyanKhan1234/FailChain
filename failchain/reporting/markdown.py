@@ -7,7 +7,7 @@ by one or more batch runs. Handles heading renumbering when merging batches.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from failchain.models import AnalysisReport, AnalysisResult
@@ -29,7 +29,7 @@ def build_report(report: AnalysisReport, report_path: str = "") -> str:
     lines: list[str] = [
         "# FailChain — Test Failure Analysis Report",
         "",
-        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
     ]
 
     if report_path:

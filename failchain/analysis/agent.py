@@ -148,13 +148,12 @@ before writing your analysis. Produce the full markdown output when done.
 def build_agent(
     config: FailChainConfig,
     tools: list[BaseTool],
-):
+) -> object:
     """Build a LangChain 1.x agent graph configured for failure analysis."""
     from langchain.agents import create_agent
 
-    model_string = _normalize_model_string(config)
     return create_agent(
-        model=model_string,
+        model=config.llm.agent_model,
         tools=tools,
         system_prompt=_SYSTEM_PROMPT,
     )
@@ -292,12 +291,3 @@ def _extract_fix_type(markdown: str) -> str:
     if "APPLICATION CODE FIX" in markdown:
         return "APPLICATION CODE FIX"
     return "APPLICATION CODE FIX"
-
-
-def _normalize_model_string(config: FailChainConfig) -> str:
-    """Convert our 'provider:model' format to LangChain 1.x's 'provider/model' format.
-
-    LangChain 1.x create_agent accepts strings like 'openai:gpt-4o-mini' directly —
-    same format as our config, so no transformation needed.
-    """
-    return config.llm.agent_model

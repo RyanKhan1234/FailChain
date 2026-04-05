@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -48,6 +48,7 @@ class RelatedFilesConfig(BaseModel):
 class LLMConfig(BaseModel):
     # Format: "provider:model-name"  e.g. "openai:gpt-4.1-nano", "anthropic:claude-opus-4-6"
     agent_model: str = "openai:gpt-4o-mini"
+    # Bare OpenAI model ID — used directly via the OpenAI SDK, not LangChain
     vision_model: str = "gpt-4o"
     max_prompt_tokens: int = 90_000
     max_retries: int = 3
@@ -76,12 +77,6 @@ class FailChainConfig(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _flatten_parser(cls, data: Any) -> Any:
-        """Allow top-level `parser` and `report_path` as shortcuts."""
-        return data
-
     def resolve_parser(self) -> str:
         """Return the parser type, auto-detecting from report_path if needed."""
         if self.parser != "auto":
@@ -92,14 +87,6 @@ class FailChainConfig(BaseModel):
         if ext == ".json":
             return "playwright-json"
         return "junit-xml"
-
-    def parse_llm_model(self, model_string: str) -> tuple[str, str]:
-        """Split 'provider:model-name' into (provider, model_name)."""
-        if ":" in model_string:
-            provider, model_name = model_string.split(":", 1)
-            return provider, model_name
-        return "openai", model_string
-
 
 # ---------------------------------------------------------------------------
 # Loader
@@ -163,7 +150,7 @@ def generate_example_config() -> str:
     """Return a well-commented example YAML config string."""
     return """\
 # FailChain configuration
-# https://github.com/your-org/failchain
+# https://github.com/RyanKhan1234/FailChain
 
 # Parser: junit-xml | playwright-json | auto (detect from report_path extension)
 parser: auto

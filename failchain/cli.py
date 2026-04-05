@@ -159,8 +159,6 @@ def analyze(config, report, output, parser, max_failures, skip_screenshots, skip
 )
 def init(framework, output, force):
     """Generate a starter configuration file."""
-    from failchain.config import generate_example_config
-
     out_path = Path(output)
     if out_path.exists() and not force:
         console.print(
@@ -251,7 +249,7 @@ def list_tools():
 
 
 def _framework_config(framework: str) -> str:
-    common_header = "# FailChain configuration - https://github.com/your-org/failchain\n\n"
+    common_header = "# FailChain configuration - https://github.com/RyanKhan1234/FailChain\n\n"
 
     if framework == "playwright":
         return common_header + """\

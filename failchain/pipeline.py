@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from failchain.analysis.agent import analyze_batch, build_agent
 from failchain.analysis.batching import pack_into_batches
@@ -94,13 +93,13 @@ def run_pipeline(
     _log(verbose, f"  {len(failures)} failures -> {len(groups)} group(s)")
 
     # ------------------------------------------------------------------
-    # Phase 4: Vision analysis of screenshots per group
+    # Phase 2b: Vision analysis of screenshots per group
     # ------------------------------------------------------------------
     if not config.analysis.skip_screenshots:
         groups = _run_screenshot_analysis(groups, config, verbose)
 
     # ------------------------------------------------------------------
-    # Phase 5: Token-aware batching
+    # Phase 4: Token-aware batching
     # ------------------------------------------------------------------
     _log(verbose, "[bold]Phase 4:[/bold] Packing groups into token-aware batches")
 
@@ -111,7 +110,7 @@ def run_pipeline(
     _log(verbose, f"  {len(groups)} groups -> {len(batches)} batch(es)")
 
     # ------------------------------------------------------------------
-    # Phase 6: Build agent + tools
+    # Phase 5: Build agent + tools
     # ------------------------------------------------------------------
     _log(verbose, "[bold]Phase 5:[/bold] Building agent and tools")
 
@@ -128,9 +127,27 @@ def run_pipeline(
     agent = build_agent(config, tools)
 
     # ------------------------------------------------------------------
-    # Phase 7: Agent analysis (per batch)
+    # Phase 6: Agent analysis (per batch)
     # ------------------------------------------------------------------
     _log(verbose, f"[bold]Phase 6:[/bold] Running agent analysis across {len(batches)} batch(es)")
+
+    def _on_retry(attempt: int, exc: Exception) -> None:
+        console.print(
+            f"  [yellow]Rate limit hit (attempt {attempt}). Retrying...[/yellow]"
+        )
+
+    def _on_tool_call(tool_name: str, args: dict) -> None:
+        if not verbose:
+            return
+        if tool_name == "read_test_source":
+            console.print(f"    [dim]read  [/dim] [cyan]{args.get('path', '')}[/cyan]")
+        elif tool_name == "search_source_code":
+            pattern = args.get("pattern", "")
+            directory = args.get("directory", "")
+            loc = f"  [dim]in {directory}[/dim]" if directory else ""
+            console.print(f"    [dim]search[/dim] [yellow]{pattern!r}[/yellow]{loc}")
+        elif tool_name == "rerun_test":
+            console.print(f"    [dim]rerun [/dim] [magenta]{args.get('path', '')}[/magenta]")
 
     all_batch_results: list[list[AnalysisResult]] = []
     for batch_num, batch in enumerate(batches, 1):
@@ -141,24 +158,6 @@ def run_pipeline(
             for i, group in enumerate(batch, 1):
                 console.print(f"    [dim]{i}.[/dim] {group.representative.title}")
             console.print()
-
-        def _on_retry(attempt: int, exc: Exception) -> None:
-            console.print(
-                f"  [yellow]Rate limit hit (attempt {attempt}). Retrying...[/yellow]"
-            )
-
-        def _on_tool_call(tool_name: str, args: dict) -> None:
-            if not verbose:
-                return
-            if tool_name == "read_test_source":
-                console.print(f"    [dim]read  [/dim] [cyan]{args.get('path', '')}[/cyan]")
-            elif tool_name == "search_source_code":
-                pattern = args.get("pattern", "")
-                directory = args.get("directory", "")
-                loc = f"  [dim]in {directory}[/dim]" if directory else ""
-                console.print(f"    [dim]search[/dim] [yellow]{pattern!r}[/yellow]{loc}")
-            elif tool_name == "rerun_test":
-                console.print(f"    [dim]rerun [/dim] [magenta]{args.get('path', '')}[/magenta]")
 
         results = analyze_batch(
             agent=agent,
@@ -171,7 +170,7 @@ def run_pipeline(
         all_batch_results.append(results)
 
     # ------------------------------------------------------------------
-    # Phase 8: Merge + write report
+    # Phase 7: Merge + write report
     # ------------------------------------------------------------------
     _log(verbose, "[bold]Phase 7:[/bold] Assembling final report")
 

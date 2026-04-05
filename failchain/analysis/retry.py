@@ -53,7 +53,8 @@ def with_retry(
                 on_retry(attempt + 1, exc)
             time.sleep(sleep_time)
 
-    assert last_exc is not None
+    if last_exc is None:
+        raise RuntimeError("with_retry: no exception recorded after exhausted retries")
     raise last_exc
 
 
