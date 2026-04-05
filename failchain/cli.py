@@ -29,6 +29,8 @@ def main():
         failchain analyze --config my.yml       # use a specific config file
         failchain analyze --report results.xml  # override report path inline
     """
+    from dotenv import load_dotenv
+    load_dotenv()
 
 
 # ---------------------------------------------------------------------------
@@ -377,3 +379,7 @@ analysis:
   skip_screenshots: true
   collapse_threshold: 5
 """
+
+
+if __name__ == "__main__":
+    main()
