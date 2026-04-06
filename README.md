@@ -20,11 +20,11 @@ The pipeline parses your test report, runs vision-model analysis on failure scre
 FailChain runs a multi-phase AI pipeline against your test report:
 
 ```
-Parse  →  Screenshots  →  Group  →  Batch  →  Agent  →  Report
-  │            │            │          │          │          │
-Read       Vision       Cluster    Token-    LangChain   Markdown
-test      model on     by file   aware      agent +      with
-results  failures    + error     packing    tools      categories
+Parse  →  Screenshots  →  Group  →  Vision  →  Static   →  Batch  →  Agent  →  Report
+  │            │            │       Analysis    Pre-Analysis    │          │          │
+Read       Discover     Cluster   GPT-4V per  Deterministic  Token-   LangGraph   Markdown
+test      screenshots   by file   group       selector/       aware    agent +      with
+results   per failure + error     screenshots timeout checks  packing    tools      categories
 ```
 
 The agent investigates each failure using tools — reading test source files, searching your application code, optionally re-running the test — and produces a report that categorizes every failure as either:
@@ -72,14 +72,8 @@ the current attribute value, and audit other specs in the suite that may referen
 ## Installation
 
 ```bash
-pip install failchain
-```
-
-Or from source:
-
-```bash
-git clone https://github.com/your-org/failchain.git
-cd failchain
+git clone https://github.com/RyanKhan1234/FailChain.git
+cd FailChain
 pip install -e .
 ```
 
@@ -286,8 +280,9 @@ failchain/
 ├── analysis/
 │   ├── grouping.py    Cluster failures by (spec_file, error_signature)
 │   ├── batching.py    Greedy token-aware bin-packing into batches
-│   ├── screenshot_analysis.py  Vision model pre-analysis
-│   ├── agent.py       LangChain agent (create_agent, LangChain 1.x)
+│   ├── screenshot_analysis.py  Vision model pre-analysis (GPT-4V per group)
+│   ├── static_hints.py         Deterministic pre-analysis injected into prompt
+│   ├── agent.py       LangGraph react agent (temperature=0, tool-calling)
 │   └── retry.py       Exponential backoff for rate limits
 ├── reporting/         Assemble, merge, renumber, and write the Markdown report
 ├── pipeline.py        Orchestrates all phases
